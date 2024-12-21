@@ -5,16 +5,50 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { text } = body;
 
-    // TODO: Call your Image Generation API here
-    // For now, we'll just echo back the text
+    console.log("Received prompt:", text);
+
+    const modalEndpoint =
+      "https://deuki1209--sdxl-turbo-with-caption-model-generate.modal.run/";
+    console.log("Calling Modal endpoint:", modalEndpoint);
+
+    const response = await fetch(
+      `${modalEndpoint}?prompt=${encodeURIComponent(text)}`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+      }
+    );
+
+    console.log("Modal response status:", response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Error response from Modal:", errorText);
+      throw new Error(
+        `Failed to generate image: ${response.status} ${errorText}`
+      );
+    }
+
+    const data = await response.json();
+    const imageBytes = Buffer.from(data.image_bytes, "hex");
+    const base64Image = `data:image/jpeg;base64,${imageBytes.toString("base64")}`;
 
     return NextResponse.json({
       success: true,
-      message: `Received: ${text}`,
+      image: base64Image,
+      caption: data.caption,
     });
   } catch (error) {
+    console.error("Detailed error:", error);
     return NextResponse.json(
-      { success: false, error: "Failed to process request" },
+      {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to generate image",
+        details: error instanceof Error ? error.stack : undefined,
+      },
       { status: 500 }
     );
   }
